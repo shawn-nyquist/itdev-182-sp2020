@@ -1,43 +1,111 @@
 import React from 'react';
-import { StyleSheet, Text, View, Platform, TextInput, KeyboardAvoidingView, ImageBackground } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  ImageBackground,
+  Text,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+  StatusBar,
+  Platform,
+} from 'react-native';
+
 import getImageForWeather from './utils/getImageForWeather';
+import { fetchLocationId, fetchWeather } from './utils/api';
+
 import SearchInput from './components/SearchInput';
 
-
-
-
-export default function App() {
-  const location = 'San Francisco';
-
-  return (
+export default class App extends React.Component {
+  constructor(props) {
+    super(props);
     
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior="padding"
-      >
+    this.state = {
+      loading: false,
+      error: false,
+      location: '',
+      temperature: 0,
+      weather: '',
+    };
+  }
+
+  componentDidMount() {
+    this.handleUpdateLocation('San Francisco');
+  }
+
+  handleUpdateLocation = async city => {
+    if (!city) return;
+
+    this.setState({ loading: true }, async () => {
+      try {
+        const locationId = await fetchLocationId(city);
+        const { location, weather, temperature } = await fetchWeather(
+          locationId,
+        );
+
+        this.setState({
+          loading: false,
+          error: false,
+          location,
+          weather,
+          temperature,
+        });
+      } catch (e) {
+        this.setState({
+          loading: false,
+          error: true,
+        });
+      }
+    });
+  };
+
+  render() {
+    const { loading, error, location, weather, temperature } = this.state;
+
+    return (
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <StatusBar barStyle="light-content" />
         <ImageBackground
-          source={getImageForWeather('Clear')}
+          source={getImageForWeather(weather)}
           style={styles.imageContainer}
           imageStyle={styles.image}
         >
           <View style={styles.detailsContainer}>
-            <Text style={[styles.largeText, styles.textStyle]}>
-              {location}
-            </Text>
-            <Text style={[styles.smallText, styles.textStyle]}>
-              Light Cloud
-            </Text>
-            <Text style={[styles.largeText, styles.textStyle]}>
-              24°
-            </Text>
-          
-            <SearchInput placeholder="Search any city" />
-          </View>
-        </ImageBackground> 
-      </KeyboardAvoidingView>
-  );
-}
+          <ActivityIndicator animating={loading} color="white" size="large" />
+            
+          {!loading && (
+              <View>
+                {error && (
+                  <Text style={[styles.smallText, styles.textStyle]}>
+                    Could not load weather, please try a different city.
+                  </Text>
+                )}
 
+                {!error && (
+                  <View>
+                    <Text style={[styles.largeText, styles.textStyle]}>
+                      {location}
+                    </Text>
+                    <Text style={[styles.smallText, styles.textStyle]}>
+                      {weather}
+                    </Text>
+                    <Text style={[styles.largeText, styles.textStyle]}>
+                      {`${Math.round(temperature)}°`}
+                    </Text>
+                  </View>
+                )}
+
+                <SearchInput
+                  placeholder="Search any city"
+                  onSubmit={this.handleUpdateLocation}
+                />
+              </View>
+            )}   
+          </View>
+        </ImageBackground>
+      </KeyboardAvoidingView>
+    );
+  }
+}
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -55,19 +123,12 @@ const styles = StyleSheet.create({
   detailsContainer: {
     flex: 1,
     justifyContent: 'center',
-    backgroundColor: 'rgba (0,0,0,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     paddingHorizontal: 20,
   },
   textStyle: {
     textAlign: 'center',
-    ...Platform.select({
-      ios: {
-        fontFamily: 'AvenirNext-Regular',
-      },
-      android: { 
-        fontFamily: 'Roboto',
-      }
-    }),
+    fontFamily: Platform.OS === 'ios' ? 'AvenirNext-Regular' : 'Roboto',
     color: 'white',
   },
   largeText: {
@@ -76,14 +137,4 @@ const styles = StyleSheet.create({
   smallText: {
     fontSize: 18,
   },
-  TextInput: {
-    backgroundColor: '#666',
-    color: 'white',
-    height: 40,
-    width: 300,
-    marginTop: 20,
-    marginHorizontal: 20,
-    paddingHorizontal: 10,
-    alignSelf: 'center',
-  }
 });
